@@ -585,6 +585,7 @@ export function ParticleTextLogo({
     fontFamily,
     fontWeight,
     particleDensity,
+    logoParticleDensity,
     particleSize,
     volumeDepth,
     bevel,
