@@ -120,9 +120,10 @@ const VERTEX_SHADER = `
       pos += rebuildFlow * transitionFlow * 0.22;
 
       vec3 idleNoise = curlNoise(pos * 1.5 + uTime * uNoiseSpeed + aRandom * 10.0);
-      // Keep the text counters crisp while retaining the livelier logo motion.
+      // Keep the text counters crisp while tightening the logo so it looks solid/pekat.
       float idleShapeHold = mix(0.28, 1.0, morphEase);
-      pos += idleNoise * uNoiseAmplitude * idleShapeHold;
+      float logoTightness = mix(1.0, 0.55, morphEase);
+      pos += idleNoise * uNoiseAmplitude * idleShapeHold * logoTightness;
 
       vec3 dirToMouse = pos - uMouse;
       float distToMouse = length(dirToMouse);
