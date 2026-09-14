@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
+import arcaneLogo from "@/assets/arcane-logo.png.asset.json";
 
 export interface ParticleTextLogoProps {
   text?: string;
@@ -33,10 +34,12 @@ const VERTEX_SHADER = `
   uniform float uParticleSize;
   uniform float uNoiseSpeed;
   uniform float uNoiseAmplitude;
+  uniform float uMorph;
 
   attribute vec3 aColor;
   attribute vec3 aNormal;
   attribute float aRandom;
+  attribute vec3 aTarget;
 
   varying vec3 vColor;
   varying vec3 vNormal;
@@ -108,7 +111,12 @@ const VERTEX_SHADER = `
   void main() {
       vColor = aColor;
       vLocalZ = position.z;
-      vec3 pos = position;
+      float morphEase = uMorph * uMorph * (3.0 - 2.0 * uMorph);
+      vec3 pos = mix(position, aTarget, morphEase);
+
+      float transitionFlow = sin(morphEase * 3.14159265);
+      vec3 rebuildFlow = curlNoise(pos * 0.9 + aRandom * 7.0 + uTime * 0.35);
+      pos += rebuildFlow * transitionFlow * 0.22;
 
       vec3 idleNoise = curlNoise(pos * 1.5 + uTime * uNoiseSpeed + aRandom * 10.0);
       pos += idleNoise * uNoiseAmplitude;
@@ -183,12 +191,12 @@ const FRAGMENT_SHADER = `
  */
 export function ParticleTextLogo({
   text = "ARCANE LABS",
-  fontFamily = "Inter, ui-sans-serif, system-ui, sans-serif",
-  fontWeight = 800,
+  fontFamily = "Arial Black, Arial, ui-sans-serif, sans-serif",
+  fontWeight = 900,
   particleDensity = 4,
   particleSize = 1.35,
   volumeDepth = 1.5,
-  bevel = 0.45,
+  bevel = 0.08,
   scale = 30,
   color1 = "#111111",
   color2 = "#010101",
@@ -216,6 +224,9 @@ export function ParticleTextLogo({
     let raf = 0;
     let visible = true;
     let orbitRadius = cameraDistance;
+    let lastFrame = performance.now();
+    let elapsed = 0;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     const orbit = { theta: 0, phi: Math.PI / 2 };
     const targetOrbit = { theta: 0, phi: Math.PI / 2 };
@@ -253,7 +264,32 @@ export function ParticleTextLogo({
       return ctx.getImageData(0, 0, CANVAS_SIZE, CANVAS_SIZE);
     };
 
-    const buildParticles = () => {
+    const buildLogoTexture = (image: HTMLImageElement): ImageData => {
+      const size = 512;
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) return new ImageData(size, size);
+      const inset = 34;
+      ctx.clearRect(0, 0, size, size);
+      ctx.drawImage(image, inset, inset, size - inset * 2, size - inset * 2);
+      return ctx.getImageData(0, 0, size, size);
+    };
+
+    const maskPoints = (imageData: ImageData) => {
+      const result: Array<[number, number]> = [];
+      const pixels = imageData.data;
+      for (let y = 0; y < 512; y += 1) {
+        for (let x = 0; x < 512; x += 1) {
+          const alpha = pixels[(y * 512 + x) * 4 + 3] ?? 0;
+          if (alpha > 150) result.push([(x / 512) * 2 - 1, -(y / 512) * 2 + 1]);
+        }
+      }
+      return result;
+    };
+
+    const buildParticles = (logoImage: HTMLImageElement) => {
       if (points) {
         points.geometry.dispose();
         (points.material as THREE.Material).dispose();
@@ -261,21 +297,17 @@ export function ParticleTextLogo({
       }
 
       const SIZE = 512;
-      const imageData = buildTextTexture();
-      const pixels = imageData.data;
+      const textPoints = maskPoints(buildTextTexture());
+      const logoPoints = maskPoints(buildLogoTexture(logoImage));
 
       const density = particleDensity;
       const depth = volumeDepth / 10;
       const bevelAmt = bevel / 10;
       const worldScale = scale / 10;
 
-      let solidCount = 0;
-      for (let i = 0; i < SIZE * SIZE; i++) {
-        if ((pixels[i * 4 + 3] ?? 0) > 80) solidCount++;
-      }
-
-      const targetTotal = Math.min(solidCount * density, 250_000);
+      const targetTotal = Math.min(Math.max(textPoints.length, logoPoints.length) * density, 180_000);
       const positions = new Float32Array(targetTotal * 3);
+      const targets = new Float32Array(targetTotal * 3);
       const colors = new Float32Array(targetTotal * 3);
       const normals = new Float32Array(targetTotal * 3);
       const randoms = new Float32Array(targetTotal);
@@ -285,68 +317,51 @@ export function ParticleTextLogo({
       const tmpColor = new THREE.Color();
       const tmpColor2 = new THREE.Color();
 
-      let written = 0;
-      let posIdx = 0;
-      const ratio = targetTotal > 0 ? solidCount * density / targetTotal : 1;
-      let accum = 0;
       const TAU = Math.PI * 2;
+      if (textPoints.length === 0 || logoPoints.length === 0) return;
 
-      for (let y = 0; y < SIZE; y++) {
-        for (let x = 0; x < SIZE; x++) {
-          const idx = (y * SIZE + x) * 4;
-          if ((pixels[idx + 3] ?? 0) <= 80) continue;
+      for (let written = 0; written < targetTotal; written += 1) {
+        const posIdx = written * 3;
+        const textPoint = textPoints[Math.floor(Math.random() * textPoints.length)];
+        const logoPoint = logoPoints[Math.floor(Math.random() * logoPoints.length)];
+        if (!textPoint || !logoPoint) continue;
 
-          const nx = (x / SIZE) * 2 - 1;
-          const ny = -(y / SIZE) * 2 + 1;
+        const theta = Math.random() * TAU;
+        const phi = Math.acos(2 * Math.random() - 1);
+        const r = Math.random() ** 1.8;
+        const px = r * Math.sin(phi) * Math.cos(theta) * bevelAmt;
+        const py = r * Math.sin(phi) * Math.sin(theta) * bevelAmt;
+        const pz = r * Math.cos(phi) * bevelAmt;
+        const textDepth = (Math.random() - 0.5) * 2 * depth;
+        const logoDepth = (Math.random() - 0.5) * 2 * depth;
 
-          const t = (ny + 1) / 2;
-          tmpColor.lerpColors(cLow, cHigh, t);
+        positions[posIdx] = textPoint[0] * worldScale + px;
+        positions[posIdx + 1] = textPoint[1] * worldScale + py;
+        positions[posIdx + 2] = textDepth + pz;
+        targets[posIdx] = logoPoint[0] * worldScale + px;
+        targets[posIdx + 1] = logoPoint[1] * worldScale + py;
+        targets[posIdx + 2] = logoDepth + pz;
 
-          for (let g = 0; g < density; g++) {
-            accum += 1;
-            if (accum < ratio || written >= targetTotal) continue;
-            accum -= ratio;
+        const nlen = Math.sqrt(px * px + py * py + pz * pz) || 1;
+        normals[posIdx] = px / nlen;
+        normals[posIdx + 1] = py / nlen;
+        normals[posIdx + 2] = pz / nlen;
 
-            const rand1 = Math.random();
-            const rand2 = Math.random();
-            const theta = rand1 * TAU;
-            const phi = Math.acos(2 * rand2 - 1);
-            const r = Math.random() ** 1.5;
-            const px = r * Math.sin(phi) * Math.cos(theta) * bevelAmt;
-            const py = r * Math.sin(phi) * Math.sin(theta) * bevelAmt;
-            const pz = r * Math.cos(phi) * bevelAmt;
-            const dz = (Math.random() - 0.5) * 2 * depth;
-
-            positions[posIdx] = nx * worldScale + px;
-            positions[posIdx + 1] = ny * worldScale + py;
-            positions[posIdx + 2] = dz + pz;
-
-            const nlen = Math.sqrt(px * px + py * py + pz * pz) || 1;
-            normals[posIdx] = px / nlen;
-            normals[posIdx + 1] = py / nlen;
-            normals[posIdx + 2] = pz / nlen;
-
-            tmpColor2.copy(tmpColor);
-            const hueJitter = (Math.random() - 0.5) * 0.03;
-            tmpColor2.offsetHSL(hueJitter, 0, 0);
-            colors[posIdx] = tmpColor2.r;
-            colors[posIdx + 1] = tmpColor2.g;
-            colors[posIdx + 2] = tmpColor2.b;
-
-            randoms[written] = Math.random();
-
-            posIdx += 3;
-            written += 1;
-          }
-        }
+        tmpColor.lerpColors(cLow, cHigh, (textPoint[1] + 1) / 2);
+        tmpColor2.copy(tmpColor).offsetHSL((Math.random() - 0.5) * 0.03, 0, 0);
+        colors[posIdx] = tmpColor2.r;
+        colors[posIdx + 1] = tmpColor2.g;
+        colors[posIdx + 2] = tmpColor2.b;
+        randoms[written] = Math.random();
       }
 
       const geometry = new THREE.BufferGeometry();
       geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute("aTarget", new THREE.BufferAttribute(targets, 3));
       geometry.setAttribute("aColor", new THREE.BufferAttribute(colors, 3));
       geometry.setAttribute("aNormal", new THREE.BufferAttribute(normals, 3));
       geometry.setAttribute("aRandom", new THREE.BufferAttribute(randoms, 1));
-      geometry.setDrawRange(0, written);
+      geometry.setDrawRange(0, targetTotal);
       geometry.computeBoundingSphere();
 
       const lightDir = new THREE.Vector3(1, 1, 1).normalize();
@@ -359,6 +374,7 @@ export function ParticleTextLogo({
         uParticleSize: { value: particleSize * (renderer?.getPixelRatio() ?? 1) },
         uNoiseSpeed: { value: animationSpeed / 100 },
         uNoiseAmplitude: { value: noiseAmplitude / 100 },
+        uMorph: { value: 0 },
         uLightColor: { value: new THREE.Color(lightColor) },
         uShadowColor: { value: new THREE.Color(shadowColor) },
         uLightDir: { value: lightDir },
@@ -397,13 +413,21 @@ export function ParticleTextLogo({
       container.appendChild(renderer.domElement);
     };
 
-    const animate = () => {
+    const animate = (now: number) => {
+      const delta = Math.min((now - lastFrame) / 1000, 0.05);
+      lastFrame = now;
+      elapsed += delta;
       const u = uniforms;
       if (u) {
         const uTime = u["uTime"]!;
         const uHover = u["uHoverStrength"]!;
         const uMouse = u["uMouse"]!;
-        (uTime.value as number) += 0.016;
+        const uMorph = u["uMorph"];
+        uTime.value = (uTime.value as number) + delta;
+        if (uMorph) {
+          const phase = elapsed % 16;
+          uMorph.value = reduceMotion ? 0 : phase < 5 ? 0 : phase < 8 ? (phase - 5) / 3 : phase < 13 ? 1 : 1 - (phase - 13) / 3;
+        }
         const target = hasMouse.current ? 1 : 0;
         uHover.value = (uHover.value as number) + (target - (uHover.value as number)) * 0.05;
         if (hasMouse.current) {
@@ -466,8 +490,13 @@ export function ParticleTextLogo({
     };
 
     init();
-    buildParticles();
-    raf = requestAnimationFrame(animate);
+    const logoImage = new Image();
+    logoImage.onload = () => {
+      buildParticles(logoImage);
+      lastFrame = performance.now();
+      raf = requestAnimationFrame(animate);
+    };
+    logoImage.src = arcaneLogo.url;
 
     const resizeObserver = new ResizeObserver(() => {
       if (!renderer || !camera) return;
