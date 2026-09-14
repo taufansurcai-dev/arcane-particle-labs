@@ -324,12 +324,13 @@ export function ParticleTextLogo({
       const textPoints = maskPoints(buildTextTexture(), 1);
       const logoPoints = maskPoints(buildLogoTexture(logoImage));
 
-      const density = particleDensity;
       const depth = volumeDepth / 10;
       const bevelAmt = bevel / 10;
       const worldScale = scale / 10;
 
-      const targetTotal = Math.floor(Math.min(Math.max(textPoints.length, logoPoints.length) * density, 180_000));
+      const textTarget = Math.floor(textPoints.length * particleDensity);
+      const logoTarget = Math.floor(logoPoints.length * logoParticleDensity);
+      const targetTotal = Math.floor(Math.min(Math.max(textTarget, logoTarget), 180_000));
       const positions = new Float32Array(targetTotal * 3);
       const targets = new Float32Array(targetTotal * 3);
       const colors = new Float32Array(targetTotal * 3);
