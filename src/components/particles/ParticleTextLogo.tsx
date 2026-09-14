@@ -214,8 +214,9 @@ export function ParticleTextLogo({
   shadowColor = "#080808",
   animationSpeed = 4,
   noiseAmplitude = 3,
-  mouseRadius = 145,
-  mouseForce = 32,
+  mouseRadius = 60,
+  mouseForce = 22,
+
   cameraDistance = 6.5,
   enableRotation = true,
   rotationSpeed = 60,
