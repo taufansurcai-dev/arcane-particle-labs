@@ -6,7 +6,8 @@ export interface ParticleTextLogoProps {
   text?: string;
   fontFamily?: string;
   fontWeight?: string | number;
-  particleDensity?: number; // particles per solid pixel
+  particleDensity?: number; // particles per solid pixel (text)
+  logoParticleDensity?: number; // particles per solid pixel (logo only)
   particleSize?: number; // px
   volumeDepth?: number; // 0-200 (%) -> extrude depth
   bevel?: number; // 0-100 (%) -> edge puff
