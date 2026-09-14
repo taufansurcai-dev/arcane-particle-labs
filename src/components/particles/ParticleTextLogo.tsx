@@ -196,7 +196,7 @@ export function ParticleTextLogo({
   fontFamily = "Arial Black, Arial, ui-sans-serif, sans-serif",
   fontWeight = 900,
   particleDensity = 2.5,
-  particleSize = 1.35,
+  particleSize = 1,
   volumeDepth = 1.5,
   bevel = 0.08,
   scale = 30,
@@ -317,7 +317,7 @@ export function ParticleTextLogo({
       const SIZE = 512;
       // Erode the text mask slightly so the counters in A, R and B remain
       // visibly open after point sizing, depth and idle movement are applied.
-      const textPoints = maskPoints(buildTextTexture(), 3);
+      const textPoints = maskPoints(buildTextTexture(), 1);
       const logoPoints = maskPoints(buildLogoTexture(logoImage));
 
       const density = particleDensity;
