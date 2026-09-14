@@ -1,24 +1,28 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { ParticleTextLogo } from "@/components/particles/ParticleTextLogo";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
 export const Route = createFileRoute("/")({
+  ssr: false,
+  head: () => ({
+    meta: [
+      { title: "Arcane Labs — 3D Particle Logo" },
+      { name: "description", content: "Interactive 3D particle logo for Arcane Labs." },
+      { property: "og:title", content: "Arcane Labs — 3D Particle Logo" },
+      { property: "og:description", content: "Interactive 3D particle logo for Arcane Labs." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
 function Index() {
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
+    <main className="flex h-svh w-screen items-center justify-center overflow-hidden bg-transparent">
+      <h1 className="sr-only">Arcane Labs</h1>
+      <div className="h-full w-full">
+        <ParticleTextLogo text="ARCANE LABS" />
+      </div>
+    </main>
   );
 }
