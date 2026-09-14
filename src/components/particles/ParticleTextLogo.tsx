@@ -6,7 +6,8 @@ export interface ParticleTextLogoProps {
   text?: string;
   fontFamily?: string;
   fontWeight?: string | number;
-  particleDensity?: number; // particles per solid pixel
+  particleDensity?: number; // particles per solid pixel (text)
+  logoParticleDensity?: number; // particles per solid pixel (logo only)
   particleSize?: number; // px
   volumeDepth?: number; // 0-200 (%) -> extrude depth
   bevel?: number; // 0-100 (%) -> edge puff
@@ -119,9 +120,10 @@ const VERTEX_SHADER = `
       pos += rebuildFlow * transitionFlow * 0.22;
 
       vec3 idleNoise = curlNoise(pos * 1.5 + uTime * uNoiseSpeed + aRandom * 10.0);
-      // Keep the text counters crisp while retaining the livelier logo motion.
+      // Keep the text counters crisp while tightening the logo so it looks solid/pekat.
       float idleShapeHold = mix(0.28, 1.0, morphEase);
-      pos += idleNoise * uNoiseAmplitude * idleShapeHold;
+      float logoTightness = mix(1.0, 0.55, morphEase);
+      pos += idleNoise * uNoiseAmplitude * idleShapeHold * logoTightness;
 
       vec3 dirToMouse = pos - uMouse;
       float distToMouse = length(dirToMouse);
@@ -141,7 +143,8 @@ const VERTEX_SHADER = `
       vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
       vMvPos = mvPosition.xyz;
 
-      gl_PointSize = uParticleSize * (10.0 / -mvPosition.z);
+      float logoSizeBoost = 1.0 + morphEase * 0.5;
+      gl_PointSize = uParticleSize * (10.0 / -mvPosition.z) * logoSizeBoost;
       gl_Position = projectionMatrix * mvPosition;
   }
 `;
@@ -196,6 +199,7 @@ export function ParticleTextLogo({
   fontFamily = "Arial Black, Arial, ui-sans-serif, sans-serif",
   fontWeight = 900,
   particleDensity = 2.5,
+  logoParticleDensity = particleDensity * 2,
   particleSize = 1,
   volumeDepth = 1.5,
   bevel = 0.08,
@@ -320,12 +324,13 @@ export function ParticleTextLogo({
       const textPoints = maskPoints(buildTextTexture(), 1);
       const logoPoints = maskPoints(buildLogoTexture(logoImage));
 
-      const density = particleDensity;
       const depth = volumeDepth / 10;
       const bevelAmt = bevel / 10;
       const worldScale = scale / 10;
 
-      const targetTotal = Math.floor(Math.min(Math.max(textPoints.length, logoPoints.length) * density, 180_000));
+      const textTarget = Math.floor(textPoints.length * particleDensity);
+      const logoTarget = Math.floor(logoPoints.length * logoParticleDensity);
+      const targetTotal = Math.floor(Math.min(Math.max(textTarget, logoTarget), 180_000));
       const positions = new Float32Array(targetTotal * 3);
       const targets = new Float32Array(targetTotal * 3);
       const colors = new Float32Array(targetTotal * 3);
@@ -580,6 +585,7 @@ export function ParticleTextLogo({
     fontFamily,
     fontWeight,
     particleDensity,
+    logoParticleDensity,
     particleSize,
     volumeDepth,
     bevel,
