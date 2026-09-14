@@ -82,7 +82,6 @@ const fragmentShader = /* glsl */ `
 
 function ParticleWordmark() {
   const points = useRef<THREE.Points>(null);
-  const material = useRef<THREE.ShaderMaterial>(null);
   const pointerTarget = useRef(new THREE.Vector2(100, 100));
   const drag = useRef({ active: false, x: 0, y: 0, rx: 0, ry: 0 });
   const { size, viewport } = useThree();
@@ -93,15 +92,6 @@ function ParticleWordmark() {
     for (let i = 0; i < PARTICLE_COUNT; i += 1) random[i] = seeded(i, 8);
     return { positions, random };
   }, []);
-
-  const uniforms = useMemo(
-    () => ({
-      uTime: { value: 0 },
-      uPointer: { value: new THREE.Vector2(100, 100) },
-      uPointSize: { value: 3.9 },
-    }),
-    [],
-  );
 
   useEffect(() => {
     const element = document.querySelector("canvas");
@@ -145,16 +135,8 @@ function ParticleWordmark() {
 
   useFrame(({ clock }, rawDelta) => {
     const delta = Math.min(rawDelta, 0.05);
-    if (material.current) {
-      const timeUniform = material.current.uniforms["uTime"];
-      const pointerUniform = material.current.uniforms["uPointer"];
-      const sizeUniform = material.current.uniforms["uPointSize"];
-      if (timeUniform) timeUniform.value = clock.elapsedTime;
-      if (pointerUniform && pointerUniform.value instanceof THREE.Vector2) {
-        pointerUniform.value.lerp(pointerTarget.current, 1 - Math.exp(-8 * delta));
-      }
-      if (sizeUniform) sizeUniform.value = Math.min(5.2, Math.max(3.25, size.width / 360));
-    }
+    void clock;
+    void size;
     if (points.current) {
       points.current.rotation.x = THREE.MathUtils.lerp(points.current.rotation.x, drag.current.rx, 1 - Math.exp(-7 * delta));
       points.current.rotation.y = THREE.MathUtils.lerp(points.current.rotation.y, drag.current.ry, 1 - Math.exp(-7 * delta));
@@ -168,14 +150,7 @@ function ParticleWordmark() {
         <bufferAttribute attach="attributes-position" args={[geometryData.positions, 3]} />
         <bufferAttribute attach="attributes-aRandom" args={[geometryData.random, 1]} />
       </bufferGeometry>
-      <shaderMaterial
-        ref={material}
-        transparent
-        depthWrite={false}
-        uniforms={uniforms}
-        vertexShader={vertexShader}
-        fragmentShader={fragmentShader}
-      />
+      <pointsMaterial color={0x050506} size={0.026} sizeAttenuation transparent opacity={0.92} depthWrite={false} />
     </points>
   );
 }
