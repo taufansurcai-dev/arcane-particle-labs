@@ -143,7 +143,8 @@ const VERTEX_SHADER = `
       vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
       vMvPos = mvPosition.xyz;
 
-      gl_PointSize = uParticleSize * (10.0 / -mvPosition.z);
+      float logoSizeBoost = 1.0 + morphEase * 0.5;
+      gl_PointSize = uParticleSize * (10.0 / -mvPosition.z) * logoSizeBoost;
       gl_Position = projectionMatrix * mvPosition;
   }
 `;
