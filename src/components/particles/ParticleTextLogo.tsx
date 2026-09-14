@@ -46,6 +46,7 @@ const VERTEX_SHADER = `
   varying vec3 vNormal;
   varying vec3 vMvPos;
   varying float vLocalZ;
+  varying float vRandom;
 
   vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
   vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
@@ -112,6 +113,7 @@ const VERTEX_SHADER = `
   void main() {
       vColor = aColor;
       vLocalZ = position.z;
+      vRandom = aRandom;
       float morphEase = uMorph * uMorph * (3.0 - 2.0 * uMorph);
       vec3 pos = mix(position, aTarget, morphEase);
 
@@ -147,8 +149,9 @@ const VERTEX_SHADER = `
       vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
       vMvPos = mvPosition.xyz;
 
-      float logoSizeBoost = 1.0 + morphEase * 0.5;
-      gl_PointSize = uParticleSize * (10.0 / -mvPosition.z) * logoSizeBoost;
+      float logoSizeBoost = 1.0 + morphEase * 0.35;
+      float blockVariation = mix(0.72, 1.5, fract(aRandom * 17.37));
+      gl_PointSize = uParticleSize * (10.0 / -mvPosition.z) * logoSizeBoost * blockVariation;
       gl_Position = projectionMatrix * mvPosition;
   }
 `;
@@ -163,15 +166,22 @@ const FRAGMENT_SHADER = `
   varying vec3 vNormal;
   varying vec3 vMvPos;
   varying float vLocalZ;
+  varying float vRandom;
 
   void main() {
+      // Render every point as a crisp, slightly rotated pixel block instead
+      // of a round dust grain. Faceted edge lighting gives it visible depth.
       vec2 coord = gl_PointCoord - vec2(0.5);
-      float dist = length(coord);
-      if (dist > 0.5) discard;
+      float angle = (vRandom - 0.5) * 0.65;
+      float cs = cos(angle);
+      float sn = sin(angle);
+      vec2 blockUv = mat2(cs, -sn, sn, cs) * coord;
+      if (max(abs(blockUv.x), abs(blockUv.y)) > 0.46) discard;
 
-      float z = sqrt(max(0.0, 0.25 - dist * dist));
-      vec3 microNormal = normalize(vec3(coord.x, -coord.y, z));
-      vec3 normal = normalize(vNormal * 0.7 + microNormal * 0.3);
+      float topFace = smoothstep(0.24, 0.46, blockUv.y);
+      float sideFace = smoothstep(0.24, 0.46, blockUv.x);
+      vec3 microNormal = normalize(vec3(sideFace * 0.9, -topFace * 0.9, 1.0));
+      vec3 normal = normalize(vNormal * 0.45 + microNormal * 0.55);
 
       vec3 viewDir = normalize(-vMvPos);
       vec3 lightDir = normalize(uLightDir);
@@ -186,15 +196,16 @@ const FRAGMENT_SHADER = `
       float spec = pow(max(dot(normal, halfVector), 0.0), 32.0);
       vec3 specular = spec * uLightColor * ao * 1.5;
 
-      vec3 finalColor = vColor * (diffuse + ambient) + specular;
+      float faceShade = 1.0 + topFace * 0.3 - sideFace * 0.22;
+      vec3 finalColor = vColor * (diffuse + ambient) * faceShade + specular;
       gl_FragColor = vec4(finalColor, 1.0);
   }
 `;
 
 /**
  * Renders arbitrary text as an offscreen canvas mask, samples the solid
- * pixels, and turns each one into a small "sand" volume of GPU particles.
- * Mouse movement scatters nearby particles outward in a swirling vortex;
+ * pixels, and turns each one into a small pixel-block volume of GPU particles.
+ * Mouse movement scatters nearby blocks outward in a swirling vortex;
  * particles idle with gentle curl-noise drift when the pointer is away.
  * Background is fully transparent (alpha:true, clearColor alpha 0).
  */
@@ -204,7 +215,7 @@ export function ParticleTextLogo({
   fontWeight = 900,
   particleDensity = 2.5,
   logoParticleDensity = particleDensity * 2,
-  particleSize = 1,
+  particleSize = 2.15,
   volumeDepth = 1.5,
   bevel = 0.08,
   scale = 30,
@@ -335,7 +346,8 @@ export function ParticleTextLogo({
 
       const textTarget = Math.floor(textPoints.length * particleDensity);
       const logoTarget = Math.floor(logoPoints.length * logoParticleDensity);
-      const targetTotal = Math.floor(Math.min(Math.max(textTarget, logoTarget), 180_000));
+      // Larger pixel blocks stay readable with a lower draw count than dust.
+      const targetTotal = Math.floor(Math.min(Math.max(textTarget, logoTarget), 55_000));
       const positions = new Float32Array(targetTotal * 3);
       const targets = new Float32Array(targetTotal * 3);
       const colors = new Float32Array(targetTotal * 3);
