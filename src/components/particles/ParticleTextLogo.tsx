@@ -189,7 +189,7 @@ export function ParticleTextLogo({
   particleSize = 1.35,
   volumeDepth = 1.5,
   bevel = 0.45,
-  scale = 45,
+  scale = 30,
   color1 = "#111111",
   color2 = "#010101",
   lightColor = "#FFFFFF",
