@@ -225,7 +225,7 @@ export function ParticleTextLogo({
     let visible = true;
     let orbitRadius = cameraDistance;
     let lastFrame = performance.now();
-    let elapsed = 0;
+    let cycleStartedAt = performance.now();
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     const orbit = { theta: 0, phi: Math.PI / 2 };
@@ -416,16 +416,16 @@ export function ParticleTextLogo({
     const animate = (now: number) => {
       const delta = Math.min((now - lastFrame) / 1000, 0.05);
       lastFrame = now;
-      elapsed += delta;
       const u = uniforms;
       if (u) {
-        const uTime = u["uTime"]!;
-        const uHover = u["uHoverStrength"]!;
-        const uMouse = u["uMouse"]!;
+        const uTime = u["uTime"];
+        const uHover = u["uHoverStrength"];
+        const uMouse = u["uMouse"];
         const uMorph = u["uMorph"];
+        if (!uTime || !uHover || !uMouse) return;
         uTime.value = (uTime.value as number) + delta;
         if (uMorph) {
-          const phase = elapsed % 16;
+          const phase = ((now - cycleStartedAt) / 1000) % 16;
           uMorph.value = reduceMotion ? 0 : phase < 5 ? 0 : phase < 8 ? (phase - 5) / 3 : phase < 13 ? 1 : 1 - (phase - 13) / 3;
         }
         const target = hasMouse.current ? 1 : 0;
@@ -438,9 +438,10 @@ export function ParticleTextLogo({
       const ease = 0.08;
       orbit.theta += (targetOrbit.theta - orbit.theta) * ease;
       orbit.phi += (targetOrbit.phi - orbit.phi) * ease;
-      camera!.position.setFromSphericalCoords(orbitRadius, orbit.phi, orbit.theta);
-      camera!.lookAt(0, 0, 0);
-      renderer!.render(scene!, camera!);
+      if (!camera || !renderer || !scene) return;
+      camera.position.setFromSphericalCoords(orbitRadius, orbit.phi, orbit.theta);
+      camera.lookAt(0, 0, 0);
+      renderer.render(scene, camera);
 
       if (visible) raf = requestAnimationFrame(animate);
     };
@@ -494,6 +495,7 @@ export function ParticleTextLogo({
     logoImage.onload = () => {
       buildParticles(logoImage);
       lastFrame = performance.now();
+      cycleStartedAt = lastFrame;
       raf = requestAnimationFrame(animate);
     };
     logoImage.src = arcaneLogo.url;
