@@ -82,7 +82,9 @@ const fragmentShader = /* glsl */ `
 
 function ParticleWordmark() {
   const points = useRef<THREE.Points>(null);
+  const positions = useRef<THREE.BufferAttribute>(null);
   const pointerTarget = useRef(new THREE.Vector2(100, 100));
+  const smoothedPointer = useRef(new THREE.Vector2(100, 100));
   const drag = useRef({ active: false, x: 0, y: 0, rx: 0, ry: 0 });
   const { size, viewport } = useThree();
 
@@ -135,7 +137,28 @@ function ParticleWordmark() {
 
   useFrame(({ clock }, rawDelta) => {
     const delta = Math.min(rawDelta, 0.05);
-    void clock;
+    smoothedPointer.current.lerp(pointerTarget.current, 1 - Math.exp(-8 * delta));
+    if (positions.current) {
+      const array = positions.current.array as Float32Array;
+      const base = geometryData.positions;
+      const pointer = smoothedPointer.current;
+      for (let i = 0; i < PARTICLE_COUNT; i += 1) {
+        const offset = i * 3;
+        const baseX = base[offset] ?? 0;
+        const baseY = base[offset + 1] ?? 0;
+        const baseZ = base[offset + 2] ?? 0;
+        const wave = Math.sin(clock.elapsedTime * 0.75 + baseX * 1.35 + geometryData.random[i] * 8) * 0.055;
+        const dx = baseX - pointer.x;
+        const dy = baseY - pointer.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const influence = Math.max(0, 1 - distance / 1.6);
+        const invDistance = distance > 0.001 ? 1 / distance : 0;
+        array[offset] = baseX + dx * invDistance * influence * 0.32;
+        array[offset + 1] = baseY + dy * invDistance * influence * 0.32 + wave * 0.18;
+        array[offset + 2] = baseZ + wave + influence * 0.38;
+      }
+      positions.current.needsUpdate = true;
+    }
     void size;
     if (points.current) {
       points.current.rotation.x = THREE.MathUtils.lerp(points.current.rotation.x, drag.current.rx, 1 - Math.exp(-7 * delta));
@@ -143,11 +166,11 @@ function ParticleWordmark() {
     }
   });
 
-  const scale = Math.min(viewport.width / 20.5, viewport.height / 5.5);
+  const scale = Math.min(viewport.width / 4.8, viewport.height / 1.5);
   return (
     <points ref={points} scale={scale}>
       <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[geometryData.positions, 3]} />
+        <bufferAttribute ref={positions} attach="attributes-position" args={[geometryData.positions.slice(), 3]} />
         <bufferAttribute attach="attributes-aRandom" args={[geometryData.random, 1]} />
       </bufferGeometry>
       <pointsMaterial color={0x050506} size={0.026} sizeAttenuation transparent opacity={0.92} depthWrite={false} />
