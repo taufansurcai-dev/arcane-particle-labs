@@ -197,6 +197,7 @@ export function ParticleTextLogo({
   fontFamily = "Arial Black, Arial, ui-sans-serif, sans-serif",
   fontWeight = 900,
   particleDensity = 2.5,
+  logoParticleDensity = particleDensity * 2,
   particleSize = 1,
   volumeDepth = 1.5,
   bevel = 0.08,
