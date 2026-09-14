@@ -215,6 +215,7 @@ export function ParticleTextLogo({
     let points: THREE.Points | undefined;
     let raf = 0;
     let visible = true;
+    let orbitRadius = cameraDistance;
 
     const orbit = { theta: 0, phi: Math.PI / 2 };
     const targetOrbit = { theta: 0, phi: Math.PI / 2 };
@@ -381,7 +382,10 @@ export function ParticleTextLogo({
     const init = () => {
       scene = new THREE.Scene();
       camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
-      camera.position.setFromSphericalCoords(cameraDistance, orbit.phi, orbit.theta);
+      const halfFov = THREE.MathUtils.degToRad(camera.fov * 0.5);
+      const horizontalFit = (scale / 10) / (Math.tan(halfFov) * camera.aspect) * 1.08;
+      orbitRadius = Math.max(cameraDistance, horizontalFit);
+      camera.position.setFromSphericalCoords(orbitRadius, orbit.phi, orbit.theta);
       renderer = new THREE.WebGLRenderer({
         alpha: true,
         antialias: true,
@@ -410,7 +414,7 @@ export function ParticleTextLogo({
       const ease = 0.08;
       orbit.theta += (targetOrbit.theta - orbit.theta) * ease;
       orbit.phi += (targetOrbit.phi - orbit.phi) * ease;
-      camera!.position.setFromSphericalCoords(cameraDistance, orbit.phi, orbit.theta);
+      camera!.position.setFromSphericalCoords(orbitRadius, orbit.phi, orbit.theta);
       camera!.lookAt(0, 0, 0);
       renderer!.render(scene!, camera!);
 
@@ -470,6 +474,9 @@ export function ParticleTextLogo({
       const w = container.clientWidth;
       const h = container.clientHeight;
       camera.aspect = w / h;
+      const halfFov = THREE.MathUtils.degToRad(camera.fov * 0.5);
+      const horizontalFit = (scale / 10) / (Math.tan(halfFov) * camera.aspect) * 1.08;
+      orbitRadius = Math.max(cameraDistance, horizontalFit);
       camera.updateProjectionMatrix();
       renderer.setSize(w, h);
     });
