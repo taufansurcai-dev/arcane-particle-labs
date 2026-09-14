@@ -17,7 +17,7 @@ function createTextParticles() {
   if (!context) return new Float32Array();
 
   context.clearRect(0, 0, canvas.width, canvas.height);
-  context.fillStyle = "#000";
+  context.fillStyle = "#fff";
   context.textAlign = "center";
   context.textBaseline = "middle";
   context.font = '900 276px Arial Black, Arial, sans-serif';
@@ -27,7 +27,7 @@ function createTextParticles() {
   const valid: Array<[number, number]> = [];
   for (let y = 0; y < canvas.height; y += 2) {
     for (let x = 0; x < canvas.width; x += 2) {
-      if ((pixels[(y * canvas.width + x) * 4 + 3] ?? 0) > 80) valid.push([x, y]);
+      if ((pixels[(y * canvas.width + x) * 4] ?? 0) > 80) valid.push([x, y]);
     }
   }
 
@@ -143,7 +143,7 @@ function ParticleWordmark() {
     }
   });
 
-  const scale = Math.min(viewport.width / 21, viewport.height / 7.2);
+  const scale = Math.min(viewport.width / 20.5, viewport.height / 5.5);
   return (
     <points ref={points} scale={scale}>
       <bufferGeometry>

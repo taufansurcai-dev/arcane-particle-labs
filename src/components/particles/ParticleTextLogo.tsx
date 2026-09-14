@@ -270,7 +270,7 @@ export function ParticleTextLogo({
 
       let solidCount = 0;
       for (let i = 0; i < SIZE * SIZE; i++) {
-        if (pixels[i * 4 + 3] > 80) solidCount++;
+        if ((pixels[i * 4 + 3] ?? 0) > 80) solidCount++;
       }
 
       const targetTotal = Math.min(solidCount * density, 250_000);
@@ -293,7 +293,7 @@ export function ParticleTextLogo({
       for (let y = 0; y < SIZE; y++) {
         for (let x = 0; x < SIZE; x++) {
           const idx = (y * SIZE + x) * 4;
-          if (pixels[idx + 3] <= 80) continue;
+          if ((pixels[idx + 3] ?? 0) <= 80) continue;
 
           const nx = (x / SIZE) * 2 - 1;
           const ny = -(y / SIZE) * 2 + 1;
