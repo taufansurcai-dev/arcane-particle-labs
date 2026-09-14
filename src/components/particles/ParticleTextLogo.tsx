@@ -119,7 +119,9 @@ const VERTEX_SHADER = `
       pos += rebuildFlow * transitionFlow * 0.22;
 
       vec3 idleNoise = curlNoise(pos * 1.5 + uTime * uNoiseSpeed + aRandom * 10.0);
-      pos += idleNoise * uNoiseAmplitude;
+      // Keep the text counters crisp while retaining the livelier logo motion.
+      float idleShapeHold = mix(0.28, 1.0, morphEase);
+      pos += idleNoise * uNoiseAmplitude * idleShapeHold;
 
       vec3 dirToMouse = pos - uMouse;
       float distToMouse = length(dirToMouse);
@@ -193,7 +195,7 @@ export function ParticleTextLogo({
   text = "ARCANE LABS",
   fontFamily = "Arial Black, Arial, ui-sans-serif, sans-serif",
   fontWeight = 900,
-  particleDensity = 4,
+  particleDensity = 2.5,
   particleSize = 1.35,
   volumeDepth = 1.5,
   bevel = 0.08,
@@ -246,7 +248,8 @@ export function ParticleTextLogo({
       const canvas = document.createElement("canvas");
       canvas.width = CANVAS_SIZE;
       canvas.height = CANVAS_SIZE;
-      const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) return new ImageData(CANVAS_SIZE, CANVAS_SIZE);
       ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
       ctx.fillStyle = "#fff";
       ctx.textAlign = "center";
@@ -277,13 +280,28 @@ export function ParticleTextLogo({
       return ctx.getImageData(0, 0, size, size);
     };
 
-    const maskPoints = (imageData: ImageData) => {
+    const maskPoints = (imageData: ImageData, erosionRadius = 0) => {
       const result: Array<[number, number]> = [];
       const pixels = imageData.data;
-      for (let y = 0; y < 512; y += 1) {
-        for (let x = 0; x < 512; x += 1) {
-          const alpha = pixels[(y * 512 + x) * 4 + 3] ?? 0;
-          if (alpha > 150) result.push([(x / 512) * 2 - 1, -(y / 512) * 2 + 1]);
+      const width = imageData.width;
+      const height = imageData.height;
+      const isSolid = (x: number, y: number) => {
+        if (x < 0 || x >= width || y < 0 || y >= height) return false;
+        return (pixels[(y * width + x) * 4 + 3] ?? 0) > 150;
+      };
+      for (let y = erosionRadius; y < height - erosionRadius; y += 1) {
+        for (let x = erosionRadius; x < width - erosionRadius; x += 1) {
+          if (!isSolid(x, y)) continue;
+          let keep = true;
+          for (let oy = -erosionRadius; oy <= erosionRadius && keep; oy += 1) {
+            for (let ox = -erosionRadius; ox <= erosionRadius; ox += 1) {
+              if (!isSolid(x + ox, y + oy)) {
+                keep = false;
+                break;
+              }
+            }
+          }
+          if (keep) result.push([(x / width) * 2 - 1, -(y / height) * 2 + 1]);
         }
       }
       return result;
@@ -297,7 +315,9 @@ export function ParticleTextLogo({
       }
 
       const SIZE = 512;
-      const textPoints = maskPoints(buildTextTexture());
+      // Erode the text mask slightly so the counters in A, R and B remain
+      // visibly open after point sizing, depth and idle movement are applied.
+      const textPoints = maskPoints(buildTextTexture(), 3);
       const logoPoints = maskPoints(buildLogoTexture(logoImage));
 
       const density = particleDensity;
