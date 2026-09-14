@@ -127,7 +127,10 @@ const VERTEX_SHADER = `
 
       vec3 dirToMouse = pos - uMouse;
       float distToMouse = length(dirToMouse);
+      // Tight falloff: the dust/vortex only kicks in when the cursor is very
+      // close to the actual particle shape, not merely inside the viewport.
       float influence = smoothstep(uMouseRadius, uMouseRadius * 0.1, distToMouse) * uHoverStrength;
+      influence = pow(influence, 1.35);
 
       if (influence > 0.0) {
           vec3 normDir = normalize(dirToMouse);
@@ -136,6 +139,7 @@ const VERTEX_SHADER = `
           vec3 fluidScatter = (normDir * 0.3 + vortex * 0.5 + sandCurl * 0.8);
           pos += fluidScatter * influence * uMouseForce;
       }
+
 
       vec3 finalNormal = normalize(aNormal + idleNoise * 0.2);
       vNormal = normalMatrix * finalNormal;
@@ -210,8 +214,9 @@ export function ParticleTextLogo({
   shadowColor = "#080808",
   animationSpeed = 4,
   noiseAmplitude = 3,
-  mouseRadius = 145,
-  mouseForce = 32,
+  mouseRadius = 60,
+  mouseForce = 22,
+
   cameraDistance = 6.5,
   enableRotation = true,
   rotationSpeed = 60,
