@@ -227,7 +227,7 @@ export function ParticleTextLogo({
     const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
     const planeNormal = new THREE.Vector3();
 
-    let uniforms: Record<string, { value: unknown }>;
+    let uniforms: Record<string, { value: unknown }> | undefined;
 
     const buildTextTexture = (): ImageData => {
       const CANVAS_SIZE = 512;
@@ -394,14 +394,16 @@ export function ParticleTextLogo({
     };
 
     const animate = () => {
-      if (uniforms) {
-        (uniforms.uTime.value as number) += 0.016;
+      const u = uniforms;
+      if (u) {
+        const uTime = u["uTime"]!;
+        const uHover = u["uHoverStrength"]!;
+        const uMouse = u["uMouse"]!;
+        (uTime.value as number) += 0.016;
         const target = hasMouse.current ? 1 : 0;
-        uniforms.uHoverStrength.value =
-          (uniforms.uHoverStrength.value as number) +
-          (target - (uniforms.uHoverStrength.value as number)) * 0.05;
+        uHover.value = (uHover.value as number) + (target - (uHover.value as number)) * 0.05;
         if (hasMouse.current) {
-          (uniforms.uMouse.value as THREE.Vector3).lerp(mouseWorld, 0.1);
+          (uMouse.value as THREE.Vector3).lerp(mouseWorld, 0.1);
         }
       }
 
@@ -433,13 +435,14 @@ export function ParticleTextLogo({
         lastPointer.y = e.clientY;
       }
 
-      planeNormal.subVectors(camera!.position, new THREE.Vector3(0, 0, 0)).normalize();
+      if (!camera) return;
+      planeNormal.subVectors(camera.position, new THREE.Vector3(0, 0, 0)).normalize();
       plane.setFromNormalAndCoplanarPoint(planeNormal, new THREE.Vector3(0, 0, 0));
 
       const rect = container.getBoundingClientRect();
       const ndcX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       const ndcY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-      raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera!);
+      raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
       const hit = new THREE.Vector3();
       if (raycaster.ray.intersectPlane(plane, hit)) {
         hasMouse.current = true;
@@ -472,8 +475,9 @@ export function ParticleTextLogo({
     });
     resizeObserver.observe(container);
 
-    const intersectionObserver = new IntersectionObserver(([entry]) => {
-      visible = entry.isIntersecting;
+    const intersectionObserver = new IntersectionObserver((entries) => {
+      const entry = entries[0];
+      visible = entry ? entry.isIntersecting : true;
       if (visible) {
         cancelAnimationFrame(raf);
         raf = requestAnimationFrame(animate);
