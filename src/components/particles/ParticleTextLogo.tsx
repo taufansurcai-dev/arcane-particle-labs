@@ -325,7 +325,7 @@ export function ParticleTextLogo({
       const bevelAmt = bevel / 10;
       const worldScale = scale / 10;
 
-      const targetTotal = Math.min(Math.max(textPoints.length, logoPoints.length) * density, 180_000);
+      const targetTotal = Math.floor(Math.min(Math.max(textPoints.length, logoPoints.length) * density, 180_000));
       const positions = new Float32Array(targetTotal * 3);
       const targets = new Float32Array(targetTotal * 3);
       const colors = new Float32Array(targetTotal * 3);
