@@ -27,7 +27,7 @@ function createTextParticles() {
   const valid: Array<[number, number]> = [];
   for (let y = 0; y < canvas.height; y += 2) {
     for (let x = 0; x < canvas.width; x += 2) {
-      if (pixels[(y * canvas.width + x) * 4 + 3] > 80) valid.push([x, y]);
+      if ((pixels[(y * canvas.width + x) * 4 + 3] ?? 0) > 80) valid.push([x, y]);
     }
   }
 
@@ -146,9 +146,14 @@ function ParticleWordmark() {
   useFrame(({ clock }, rawDelta) => {
     const delta = Math.min(rawDelta, 0.05);
     if (material.current) {
-      material.current.uniforms.uTime.value = clock.elapsedTime;
-      material.current.uniforms.uPointer.value.lerp(pointerTarget.current, 1 - Math.exp(-8 * delta));
-      material.current.uniforms.uPointSize.value = Math.min(5.2, Math.max(3.25, size.width / 360));
+      const timeUniform = material.current.uniforms["uTime"];
+      const pointerUniform = material.current.uniforms["uPointer"];
+      const sizeUniform = material.current.uniforms["uPointSize"];
+      if (timeUniform) timeUniform.value = clock.elapsedTime;
+      if (pointerUniform && pointerUniform.value instanceof THREE.Vector2) {
+        pointerUniform.value.lerp(pointerTarget.current, 1 - Math.exp(-8 * delta));
+      }
+      if (sizeUniform) sizeUniform.value = Math.min(5.2, Math.max(3.25, size.width / 360));
     }
     if (points.current) {
       points.current.rotation.x = THREE.MathUtils.lerp(points.current.rotation.x, drag.current.rx, 1 - Math.exp(-7 * delta));
